@@ -1,57 +1,260 @@
-local function armMockJailAfterRespawn(targetPlayer)
-    if jailAfterRespawnArmed[targetPlayer] then return end
+-- 4strxl spamrz | White hub + light purple UI
+-- MOCK jail-after-respawn system (learning-safe)
 
-    jailAfterRespawnArmed[targetPlayer] = {
-        died = false,
-        executed = false
-    }
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
 
-    notify(TITLE_TEXT, "[mock] armed jail-after-respawn for @" .. targetPlayer.Name)
+repeat task.wait() until LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
 
-    local function onCharacterAdded(character)
-        local humanoid = character:WaitForChild("Humanoid", 5)
-        if not humanoid then return end
+-- CONFIG
+local TITLE_TEXT = "4strxl spamrz"
+local COMMANDS = {"rocket","balloon","inverse","tiny","morph","jumpscare"}
 
-        -- detect death
-        humanoid.Died:Once(function()
-            if jailAfterRespawnArmed[targetPlayer] then
-                jailAfterRespawnArmed[targetPlayer].died = true
-                notify(TITLE_TEXT, "[mock] @" .. targetPlayer.Name .. " died")
+-- COLORS
+local PURPLE = Color3.fromRGB(190,160,255)
+local PURPLE_DARK = Color3.fromRGB(160,130,220)
+local BG = Color3.fromRGB(255,255,255)
+local BTN = Color3.fromRGB(190,160,255)
+
+-- NOTIFY
+local function notify(t,d)
+    pcall(function()
+        StarterGui:SetCore("SendNotification",{
+            Title=t,
+            Text=d,
+            Duration=3
+        })
+    end)
+end
+
+-- FIND REMOTE (USED ONLY FOR SPAM COMMANDS)
+local Remote
+task.spawn(function()
+    local start = os.clock()
+    repeat
+        local pkg = ReplicatedStorage:FindFirstChild("Packages")
+        if pkg and pkg:FindFirstChild("Net") then
+            Remote = pkg.Net:FindFirstChild("RE/AdminPanelService/ExecuteCommand")
+        end
+        task.wait(0.2)
+    until Remote or os.clock()-start > 8
+end)
+
+-- CLEAN OLD GUI
+pcall(function()
+    local old = LocalPlayer.PlayerGui:FindFirstChild("4strxl_spamz_gui")
+    if old then old:Destroy() end
+end)
+
+-- GUI ROOT
+local gui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+gui.Name = "4strxl_spamz_gui"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.fromOffset(300,380)
+main.Position = UDim2.fromOffset(60,120)
+main.BackgroundColor3 = BG
+main.BorderSizePixel = 0
+Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
+
+local stroke = Instance.new("UIStroke",main)
+stroke.Color = PURPLE
+stroke.Transparency = 0.25
+
+-- TOP BAR
+local top = Instance.new("Frame",main)
+top.Size = UDim2.new(1,0,0,38)
+top.BackgroundColor3 = PURPLE
+top.BorderSizePixel = 0
+Instance.new("UICorner",top).CornerRadius = UDim.new(0,14)
+
+local title = Instance.new("TextLabel",top)
+title.Size = UDim2.new(1,-90,1,0)
+title.Position = UDim2.fromOffset(12,0)
+title.BackgroundTransparency = 1
+title.Text = TITLE_TEXT
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextColor3 = Color3.fromRGB(245,245,245)
+
+local refresh = Instance.new("TextButton",top)
+refresh.Size = UDim2.fromOffset(78,26)
+refresh.Position = UDim2.new(1,-84,0,6)
+refresh.Text = "Refresh"
+refresh.Font = Enum.Font.Gotham
+refresh.TextSize = 14
+refresh.TextColor3 = Color3.fromRGB(255,255,255)
+refresh.BackgroundColor3 = PURPLE_DARK
+refresh.BorderSizePixel = 0
+Instance.new("UICorner",refresh).CornerRadius = UDim.new(0,8)
+
+-- CONTENT
+local holder = Instance.new("Frame",main)
+holder.Position = UDim2.fromOffset(8,46)
+holder.Size = UDim2.new(1,-16,1,-54)
+holder.BackgroundTransparency = 1
+
+local list = Instance.new("ScrollingFrame",holder)
+list.Size = UDim2.fromScale(1,1)
+list.ScrollBarThickness = 6
+list.BackgroundTransparency = 1
+list.BorderSizePixel = 0
+
+local layout = Instance.new("UIListLayout",list)
+layout.Padding = UDim.new(0,6)
+
+-- DRAG
+do
+    local dragging,startMouse,startPos
+    top.InputBegan:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 then
+            dragging=true
+            startMouse=i.Position
+            startPos=main.Position
+            i.Changed:Connect(function()
+                if i.UserInputState==Enum.UserInputState.End then dragging=false end
+            end)
+        end
+    end)
+    top.InputChanged:Connect(function(i)
+        if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
+            local d=i.Position-startMouse
+            main.Position=UDim2.fromOffset(startPos.X.Offset+d.X,startPos.Y.Offset+d.Y)
+        end
+    end)
+end
+
+-- SPAM FUNCTION (UNCHANGED)
+local function spamPlayer(plr)
+    if not Remote then
+        notify(TITLE_TEXT,"Remote not ready")
+        return
+    end
+    for _,cmd in ipairs(COMMANDS) do
+        pcall(function()
+            Remote:FireServer(plr,cmd)
+        end)
+    end
+    notify("Sent","Spammed @"..plr.Name)
+end
+
+-- ===============================
+-- MOCK JAIL-AFTER-RESPAWN SYSTEM
+-- ===============================
+local jailAfterRespawnArmed = {}
+
+local function armMockJailAfterRespawn(plr)
+    if jailAfterRespawnArmed[plr] then return end
+
+    jailAfterRespawnArmed[plr] = {died=false,executed=false}
+    notify(TITLE_TEXT,"[mock] armed jail-after-respawn for @"..plr.Name)
+
+    local function onCharacterAdded(char)
+        local hum = char:WaitForChild("Humanoid",5)
+        if not hum then return end
+
+        hum.Died:Once(function()
+            if jailAfterRespawnArmed[plr] then
+                jailAfterRespawnArmed[plr].died=true
+                notify(TITLE_TEXT,"[mock] @"..plr.Name.." died")
             end
         end)
 
-        -- detect respawn AFTER death
-        if jailAfterRespawnArmed[targetPlayer].died
-            and not jailAfterRespawnArmed[targetPlayer].executed then
+        if jailAfterRespawnArmed[plr].died and not jailAfterRespawnArmed[plr].executed then
+            jailAfterRespawnArmed[plr].executed=true
 
-            jailAfterRespawnArmed[targetPlayer].executed = true
-
-            -- wait for respawn blue box to finish
-            character:WaitForChild("HumanoidRootPart", 5)
+            char:WaitForChild("HumanoidRootPart",5)
             task.wait(0.1)
+            notify(TITLE_TEXT,"[mock] jail executed on @"..plr.Name)
 
-            -- MOCK jail
-            notify(
-                TITLE_TEXT,
-                "[mock] jail executed on @" .. targetPlayer.Name
-            )
-
-            -- MOCK ragdoll 0.1s later
             task.wait(0.1)
-            notify(
-                TITLE_TEXT,
-                "[mock] ragdoll executed on @" .. targetPlayer.Name
-            )
+            notify(TITLE_TEXT,"[mock] ragdoll executed on @"..plr.Name)
 
-            jailAfterRespawnArmed[targetPlayer] = nil
+            jailAfterRespawnArmed[plr]=nil
         end
     end
 
-    -- current character
-    if targetPlayer.Character then
-        onCharacterAdded(targetPlayer.Character)
+    if plr.Character then onCharacterAdded(plr.Character) end
+    plr.CharacterAdded:Connect(onCharacterAdded)
+end
+
+-- UI HELPERS
+local function section(text)
+    local l=Instance.new("TextLabel")
+    l.Size=UDim2.new(1,-6,0,26)
+    l.BackgroundTransparency=1
+    l.Text=text
+    l.Font=Enum.Font.GothamBold
+    l.TextSize=13
+    l.TextXAlignment=Enum.TextXAlignment.Left
+    l.TextColor3=Color3.fromRGB(120,120,120)
+    return l
+end
+
+local function mockButton(plr)
+    local b=Instance.new("TextButton")
+    b.Size=UDim2.new(1,-6,0,34)
+    b.Text="  jail after respawn → @"..plr.Name
+    b.TextXAlignment=Enum.TextXAlignment.Left
+    b.Font=Enum.Font.Gotham
+    b.TextSize=14
+    b.TextColor3=Color3.fromRGB(20,20,20)
+    b.BackgroundColor3=BTN
+    b.BorderSizePixel=0
+    Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
+
+    b.MouseEnter:Connect(function() b.BackgroundColor3=PURPLE_DARK end)
+    b.MouseLeave:Connect(function() b.BackgroundColor3=BTN end)
+    b.Activated:Connect(function() armMockJailAfterRespawn(plr) end)
+    return b
+end
+
+local function spamButton(plr)
+    local b=Instance.new("TextButton")
+    b.Size=UDim2.new(1,-6,0,34)
+    b.Text="  @"..plr.Name
+    b.TextXAlignment=Enum.TextXAlignment.Left
+    b.Font=Enum.Font.Gotham
+    b.TextSize=14
+    b.TextColor3=Color3.fromRGB(20,20,20)
+    b.BackgroundColor3=BTN
+    b.BorderSizePixel=0
+    Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
+
+    b.MouseEnter:Connect(function() b.BackgroundColor3=PURPLE_DARK end)
+    b.MouseLeave:Connect(function() b.BackgroundColor3=BTN end)
+    b.Activated:Connect(function() spamPlayer(plr) end)
+    return b
+end
+
+-- REFRESH
+local function refreshList()
+    for _,v in ipairs(list:GetChildren()) do
+        if v:IsA("TextButton") or v:IsA("TextLabel") then v:Destroy() end
     end
 
-    -- future respawns
-    targetPlayer.CharacterAdded:Connect(onCharacterAdded)
+    section("mock actions").Parent=list
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p~=LocalPlayer then mockButton(p).Parent=list end
+    end
+
+    section("spam commands").Parent=list
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p~=LocalPlayer then spamButton(p).Parent=list end
+    end
+
+    task.wait()
+    list.CanvasSize=UDim2.fromOffset(0,layout.AbsoluteContentSize.Y+10)
 end
+
+refresh.MouseButton1Click:Connect(refreshList)
+Players.PlayerAdded:Connect(refreshList)
+Players.PlayerRemoving:Connect(refreshList)
+
+refreshList()
+notify(TITLE_TEXT,"Hub loaded successfully")

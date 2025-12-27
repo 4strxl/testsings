@@ -1,5 +1,5 @@
 -- 4strxl spamrz | White hub + light purple UI
--- MOCK jail-after-respawn system (learning-safe)
+-- MOCK automatic jail-after-respawn system (learning-safe)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -129,7 +129,7 @@ do
     end)
 end
 
--- SPAM FUNCTION (UNCHANGED)
+-- SPAM FUNCTION
 local function spamPlayer(plr)
     if not Remote then
         notify(TITLE_TEXT,"Remote not ready")
@@ -143,46 +143,6 @@ local function spamPlayer(plr)
     notify("Sent","Spammed @"..plr.Name)
 end
 
--- ===============================
--- MOCK JAIL-AFTER-RESPAWN SYSTEM
--- ===============================
-local jailAfterRespawnArmed = {}
-
-local function armMockJailAfterRespawn(plr)
-    if jailAfterRespawnArmed[plr] then return end
-
-    jailAfterRespawnArmed[plr] = {died=false,executed=false}
-    notify(TITLE_TEXT,"[mock] armed jail-after-respawn for @"..plr.Name)
-
-    local function onCharacterAdded(char)
-        local hum = char:WaitForChild("Humanoid",5)
-        if not hum then return end
-
-        hum.Died:Once(function()
-            if jailAfterRespawnArmed[plr] then
-                jailAfterRespawnArmed[plr].died=true
-                notify(TITLE_TEXT,"[mock] @"..plr.Name.." died")
-            end
-        end)
-
-        if jailAfterRespawnArmed[plr].died and not jailAfterRespawnArmed[plr].executed then
-            jailAfterRespawnArmed[plr].executed=true
-
-            char:WaitForChild("HumanoidRootPart",5)
-            task.wait(0.1)
-            notify(TITLE_TEXT,"[mock] jail executed on @"..plr.Name)
-
-            task.wait(0.1)
-            notify(TITLE_TEXT,"[mock] ragdoll executed on @"..plr.Name)
-
-            jailAfterRespawnArmed[plr]=nil
-        end
-    end
-
-    if plr.Character then onCharacterAdded(plr.Character) end
-    plr.CharacterAdded:Connect(onCharacterAdded)
-end
-
 -- UI HELPERS
 local function section(text)
     local l=Instance.new("TextLabel")
@@ -194,24 +154,6 @@ local function section(text)
     l.TextXAlignment=Enum.TextXAlignment.Left
     l.TextColor3=Color3.fromRGB(120,120,120)
     return l
-end
-
-local function mockButton(plr)
-    local b=Instance.new("TextButton")
-    b.Size=UDim2.new(1,-6,0,34)
-    b.Text="  jail after respawn → @"..plr.Name
-    b.TextXAlignment=Enum.TextXAlignment.Left
-    b.Font=Enum.Font.Gotham
-    b.TextSize=14
-    b.TextColor3=Color3.fromRGB(20,20,20)
-    b.BackgroundColor3=BTN
-    b.BorderSizePixel=0
-    Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
-
-    b.MouseEnter:Connect(function() b.BackgroundColor3=PURPLE_DARK end)
-    b.MouseLeave:Connect(function() b.BackgroundColor3=BTN end)
-    b.Activated:Connect(function() armMockJailAfterRespawn(plr) end)
-    return b
 end
 
 local function spamButton(plr)
@@ -232,7 +174,84 @@ local function spamButton(plr)
     return b
 end
 
--- REFRESH
+-- MOCK JAIL BUTTON (dark purple)
+local function mockButton(plr)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1,-6,0,34)
+    b.Text = "  jail after respawn → @" .. plr.Name
+    b.TextXAlignment = Enum.TextXAlignment.Left
+    b.Font = Enum.Font.Gotham
+    b.TextSize = 14
+    b.TextColor3 = Color3.fromRGB(245,245,245) -- light text
+    b.BackgroundColor3 = PURPLE_DARK -- dark purple
+    b.BorderSizePixel = 0
+    Instance.new("UICorner",b).CornerRadius = UDim.new(0,8)
+
+    b.MouseEnter:Connect(function()
+        b.BackgroundColor3 = PURPLE -- lighter purple on hover
+    end)
+    b.MouseLeave:Connect(function()
+        b.BackgroundColor3 = PURPLE_DARK
+    end)
+
+    b.Activated:Connect(function()
+        -- Manual trigger if needed
+        notify(TITLE_TEXT,"[mock] jail armed for @"..plr.Name)
+    end)
+
+    return b
+end
+
+-- ===============================
+-- AUTOMATIC MOCK JAIL-AFTER-RESPAWN
+-- ===============================
+local function autoMockJail(plr)
+    plr.CharacterAdded:Connect(function(character)
+        local humanoid = character:WaitForChild("Humanoid",5)
+        if not humanoid then return end
+
+        humanoid.Died:Connect(function()
+            notify(TITLE_TEXT,"[mock] @"..plr.Name.." died")
+        end)
+
+        task.spawn(function()
+            character:WaitForChild("HumanoidRootPart",5)
+            task.wait(0.1)
+            notify(TITLE_TEXT,"[mock] jail executed on @"..plr.Name)
+            task.wait(0.1)
+            notify(TITLE_TEXT,"[mock] ragdoll executed on @"..plr.Name)
+        end)
+    end)
+
+    if plr.Character then
+        local char = plr.Character
+        local hum = char:FindFirstChild("Humanoid")
+        if hum then
+            hum.Died:Connect(function()
+                notify(TITLE_TEXT,"[mock] @"..plr.Name.." died")
+            end)
+            task.spawn(function()
+                char:WaitForChild("HumanoidRootPart",5)
+                task.wait(0.1)
+                notify(TITLE_TEXT,"[mock] jail executed on @"..plr.Name)
+                task.wait(0.1)
+                notify(TITLE_TEXT,"[mock] ragdoll executed on @"..plr.Name)
+            end)
+        end
+    end
+end
+
+-- Automatically arm all current players
+for _,p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then autoMockJail(p) end
+end
+
+-- Automatically arm new players joining
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then autoMockJail(p) end
+end)
+
+-- REFRESH LIST
 local function refreshList()
     for _,v in ipairs(list:GetChildren()) do
         if v:IsA("TextButton") or v:IsA("TextLabel") then v:Destroy() end
@@ -240,16 +259,16 @@ local function refreshList()
 
     section("mock actions").Parent=list
     for _,p in ipairs(Players:GetPlayers()) do
-        if p~=LocalPlayer then mockButton(p).Parent=list end
+        if p ~= LocalPlayer then mockButton(p).Parent = list end
     end
 
     section("spam commands").Parent=list
     for _,p in ipairs(Players:GetPlayers()) do
-        if p~=LocalPlayer then spamButton(p).Parent=list end
+        if p ~= LocalPlayer then spamButton(p).Parent = list end
     end
 
     task.wait()
-    list.CanvasSize=UDim2.fromOffset(0,layout.AbsoluteContentSize.Y+10)
+    list.CanvasSize = UDim2.fromOffset(0,layout.AbsoluteContentSize.Y+10)
 end
 
 refresh.MouseButton1Click:Connect(refreshList)

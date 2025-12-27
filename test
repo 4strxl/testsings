@@ -1,6 +1,6 @@
--- 4strxl spamrz | White hub + light purple UI
+-- 4strxl spamrz | White hub + light purple UI 
 -- Spam Hub + Jail After Death/Respawn only on last clicked target in current session
--- Commands fire instantly, no delay, with minimize button
+-- Commands fire instantly, no delay, with minimize button keeping player buttons visible
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -74,7 +74,7 @@ top.BorderSizePixel = 0
 Instance.new("UICorner",top).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel",top)
-title.Size = UDim2.new(1,-120,1,0) -- leave room for buttons
+title.Size = UDim2.new(1,-120,1,0)
 title.Position = UDim2.fromOffset(12,0)
 title.BackgroundTransparency = 1
 title.Text = TITLE_TEXT
@@ -105,18 +105,6 @@ minimize.TextColor3 = Color3.fromRGB(255,255,255)
 minimize.BackgroundColor3 = PURPLE_DARK
 minimize.BorderSizePixel = 0
 Instance.new("UICorner",minimize).CornerRadius = UDim.new(0,8)
-
-local minimized = false
-minimize.Activated:Connect(function()
-    minimized = not minimized
-    if minimized then
-        main.Size = UDim2.fromOffset(300,38) -- collapse to top bar only
-        minimize.Text = "+"
-    else
-        main.Size = UDim2.fromOffset(300,380) -- restore size
-        minimize.Text = "-"
-    end
-end)
 
 -- CONTENT
 local holder = Instance.new("Frame",main)
@@ -232,7 +220,7 @@ local function spamButton(plr)
     b.TextColor3=Color3.fromRGB(20,20,20)
     b.BackgroundColor3=BTN
     b.BorderSizePixel=0
-    Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
+    Instance.new("UICorner",b).CornerRadius = UDim.new(0,8)
 
     b.MouseEnter:Connect(function() b.BackgroundColor3=PURPLE_DARK end)
     b.MouseLeave:Connect(function() b.BackgroundColor3=BTN end)
@@ -261,3 +249,16 @@ Players.PlayerRemoving:Connect(refreshList)
 
 refreshList()
 notify(TITLE_TEXT,"Hub loaded successfully")
+
+-- MINIMIZE BUTTON LOGIC
+local minimized = false
+minimize.Activated:Connect(function()
+    minimized = not minimized
+    if minimized then
+        main.Size = UDim2.fromOffset(300,46) -- keep top bar + player list
+        minimize.Text = "+"
+    else
+        main.Size = UDim2.fromOffset(300,380)
+        minimize.Text = "-"
+    end
+end)

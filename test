@@ -1,6 +1,6 @@
--- 4strxl spamrz | White hub + light purple UI 
+-- 4strxl spamrz | White hub + light purple UI
 -- Spam Hub + Jail After Death/Respawn only on last clicked target in current session
--- Commands fire instantly, no delay, with minimize button keeping player buttons visible
+-- Commands execute in order
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -57,7 +57,8 @@ gui.IgnoreGuiInset = true
 
 local main = Instance.new("Frame", gui)
 main.Size = UDim2.fromOffset(300,380)
-main.Position = UDim2.fromOffset(60,120)
+-- Right side spawn, vertically centered
+main.Position = UDim2.new(1, -310, 0.5, -190)
 main.BackgroundColor3 = BG
 main.BorderSizePixel = 0
 Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
@@ -84,8 +85,8 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.TextColor3 = Color3.fromRGB(245,245,245)
 
 local refresh = Instance.new("TextButton",top)
-refresh.Size = UDim2.fromOffset(60,26)
-refresh.Position = UDim2.new(1,-140,0,6)
+refresh.Size = UDim2.fromOffset(78,26)
+refresh.Position = UDim2.new(1,-84,0,6)
 refresh.Text = "Refresh"
 refresh.Font = Enum.Font.Gotham
 refresh.TextSize = 14
@@ -94,16 +95,14 @@ refresh.BackgroundColor3 = PURPLE_DARK
 refresh.BorderSizePixel = 0
 Instance.new("UICorner",refresh).CornerRadius = UDim.new(0,8)
 
--- MINIMIZE BUTTON
 local minimize = Instance.new("TextButton",top)
 minimize.Size = UDim2.fromOffset(26,26)
-minimize.Position = UDim2.new(1,-60,0,6)
+minimize.Position = UDim2.new(1,-28,0,6)
 minimize.Text = "-"
-minimize.Font = Enum.Font.GothamBold
-minimize.TextSize = 18
+minimize.Font = Enum.Font.Gotham
+minimize.TextSize = 16
 minimize.TextColor3 = Color3.fromRGB(255,255,255)
 minimize.BackgroundColor3 = PURPLE_DARK
-minimize.BorderSizePixel = 0
 Instance.new("UICorner",minimize).CornerRadius = UDim.new(0,8)
 
 -- CONTENT
@@ -143,8 +142,8 @@ do
     end)
 end
 
--- SPAM FUNCTION (instant commands)
-local lastTarget
+-- SPAM FUNCTION (ordered commands)
+local lastTarget -- Only track the last clicked player
 
 local function spamPlayer(plr)
     if not Remote then
@@ -152,8 +151,9 @@ local function spamPlayer(plr)
         return
     end
 
-    lastTarget = plr
+    lastTarget = plr -- update last clicked player
 
+    -- Execute commands in order as fast as possible
     task.spawn(function()
         for _,cmd in ipairs(COMMANDS) do
             if Remote and plr then
@@ -162,25 +162,27 @@ local function spamPlayer(plr)
                 end)
             end
         end
-        notify("Sent","Spammed @"..plr.Name.." instantly")
+        notify("Sent","Spammed @"..plr.Name.." in order")
     end)
 
+    -- Track only this session
     local function trackRespawn(char)
         local humanoid = char:WaitForChild("Humanoid",5)
         if not humanoid then return end
 
         humanoid.Died:Once(function()
+            -- Wait for respawn
             plr.CharacterAdded:Wait()
             local newChar = plr.Character
             if newChar and plr == lastTarget and Players:FindFirstChild(plr.Name) then
-                task.wait(0.1)
+                task.wait(0.1) -- wait for blue respawn box
                 if Remote then
                     pcall(function() Remote:FireServer(plr,"jail") end)
                     task.wait(1.2)
                     pcall(function() Remote:FireServer(plr,"ragdoll") end)
                     notify(TITLE_TEXT,"@"..plr.Name.." jailed & ragdolled")
                 end
-                lastTarget = nil
+                lastTarget = nil -- reset after executing
             end
         end)
     end
@@ -190,6 +192,7 @@ local function spamPlayer(plr)
     end
     plr.CharacterAdded:Connect(trackRespawn)
 
+    -- Remove tracking if player leaves
     plr.AncestryChanged:Connect(function(_, parent)
         if not parent and lastTarget == plr then
             lastTarget = nil
@@ -210,21 +213,38 @@ local function section(text)
     return l
 end
 
-local function spamButton(plr)
-    local b=Instance.new("TextButton")
-    b.Size=UDim2.new(1,-6,0,34)
-    b.Text="  @"..plr.Name
-    b.TextXAlignment=Enum.TextXAlignment.Left
-    b.Font=Enum.Font.Gotham
-    b.TextSize=14
-    b.TextColor3=Color3.fromRGB(20,20,20)
-    b.BackgroundColor3=BTN
-    b.BorderSizePixel=0
-    Instance.new("UICorner",b).CornerRadius = UDim.new(0,8)
+-- PLAYER BUTTON FUNCTION
+local minimized = false
 
-    b.MouseEnter:Connect(function() b.BackgroundColor3=PURPLE_DARK end)
-    b.MouseLeave:Connect(function() b.BackgroundColor3=BTN end)
+local function spamButton(plr)
+    local b = Instance.new("TextButton")
+    b.Text = "  @"..plr.Name
+    b.TextXAlignment = Enum.TextXAlignment.Left
+    b.Font = Enum.Font.Gotham
+    b.TextSize = 14
+    b.TextColor3 = Color3.fromRGB(20,20,20)
+    b.BackgroundColor3 = BTN
+    b.BorderSizePixel = 0
+    Instance.new("UICorner",b).CornerRadius = UDim.new(0,8)
+    b.Size = UDim2.new(1,-6,0,34)
+
+    b.MouseEnter:Connect(function() b.BackgroundColor3 = PURPLE_DARK end)
+    b.MouseLeave:Connect(function() b.BackgroundColor3 = BTN end)
     b.Activated:Connect(function() spamPlayer(plr) end)
+
+    -- Resize when minimized
+    local function updateSize()
+        if minimized then
+            b.Size = UDim2.new(1,-6,0,50)
+            b.TextSize = 18
+        else
+            b.Size = UDim2.new(1,-6,0,34)
+            b.TextSize = 14
+        end
+    end
+    updateSize()
+    minimize:GetPropertyChangedSignal("Text"):Connect(updateSize)
+
     return b
 end
 
@@ -250,15 +270,26 @@ Players.PlayerRemoving:Connect(refreshList)
 refreshList()
 notify(TITLE_TEXT,"Hub loaded successfully")
 
--- MINIMIZE BUTTON LOGIC
-local minimized = false
+-- MINIMIZE LOGIC
 minimize.Activated:Connect(function()
     minimized = not minimized
     if minimized then
-        main.Size = UDim2.fromOffset(300,46) -- keep top bar + player list
+        main.Size = UDim2.fromOffset(300,46)
         minimize.Text = "+"
     else
         main.Size = UDim2.fromOffset(300,380)
         minimize.Text = "-"
+    end
+
+    for _,v in ipairs(list:GetChildren()) do
+        if v:IsA("TextButton") then
+            if minimized then
+                v.Size = UDim2.new(1,-6,0,50)
+                v.TextSize = 18
+            else
+                v.Size = UDim2.new(1,-6,0,34)
+                v.TextSize = 14
+            end
+        end
     end
 end)

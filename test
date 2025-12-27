@@ -1,12 +1,13 @@
 -- 4strxl spamrz | White hub + light purple UI
 -- Spam Hub + Jail After Death/Respawn only on last clicked target in current session
 -- Commands execute in order
--- Draggable hub fixed
+-- Draggable hub fixed + Minimize button with animation
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 repeat task.wait() until LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")
@@ -59,7 +60,7 @@ gui.IgnoreGuiInset = true
 
 local main = Instance.new("Frame", gui)
 main.Size = UDim2.fromOffset(300,380)
-main.Position = UDim2.new(1,-310,0.5,-190) -- Spawn on right middle
+main.Position = UDim2.new(1,-310,0.5,-190) -- Spawn on right-middle
 main.BackgroundColor3 = BG
 main.BorderSizePixel = 0
 Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
@@ -76,7 +77,7 @@ top.BorderSizePixel = 0
 Instance.new("UICorner",top).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel",top)
-title.Size = UDim2.new(1,-90,1,0)
+title.Size = UDim2.new(1,-120,1,0)
 title.Position = UDim2.fromOffset(12,0)
 title.BackgroundTransparency = 1
 title.Text = TITLE_TEXT
@@ -95,6 +96,31 @@ refresh.TextColor3 = Color3.fromRGB(255,255,255)
 refresh.BackgroundColor3 = PURPLE_DARK
 refresh.BorderSizePixel = 0
 Instance.new("UICorner",refresh).CornerRadius = UDim.new(0,8)
+
+-- MINIMIZE BUTTON
+local minimize = Instance.new("TextButton",top)
+minimize.Size = UDim2.fromOffset(26,26)
+minimize.Position = UDim2.new(1,-38,0,6)
+minimize.Text = "-"
+minimize.Font = Enum.Font.GothamBold
+minimize.TextSize = 18
+minimize.TextColor3 = Color3.fromRGB(255,255,255)
+minimize.BackgroundColor3 = PURPLE_DARK
+Instance.new("UICorner",minimize).CornerRadius = UDim.new(0,6)
+
+local minimized = false
+local fullSize = main.Size
+local fullCanvas = UDim2.new(1,0,1,0)
+minimize.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        local tween = TweenService:Create(main, TweenInfo.new(0.3), {Size=UDim2.new(0,100,0,38)})
+        tween:Play()
+    else
+        local tween = TweenService:Create(main, TweenInfo.new(0.3), {Size=fullSize})
+        tween:Play()
+    end
+end)
 
 -- CONTENT
 local holder = Instance.new("Frame",main)
@@ -115,23 +141,18 @@ layout.Padding = UDim.new(0,6)
 -- DRAG FIXED
 do
     local dragging = false
-    local dragInput, mousePos, framePos
+    local dragInput, startPos, startMousePos
 
     local function update(input)
-        local delta = input.Position - mousePos
-        main.Position = UDim2.new(0,
-            math.clamp(framePos.X.Offset + delta.X, 0, workspace.CurrentCamera.ViewportSize.X - main.AbsoluteSize.X),
-            0,
-            math.clamp(framePos.Y.Offset + delta.Y, 0, workspace.CurrentCamera.ViewportSize.Y - main.AbsoluteSize.Y)
-        )
+        local delta = input.Position - startMousePos
+        main.Position = UDim2.new(0, startPos.X.Offset + delta.X, 0, startPos.Y.Offset + delta.Y)
     end
 
     top.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
-            mousePos = input.Position
-            framePos = main.Position
-
+            startMousePos = input.Position
+            startPos = main.Position
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -154,60 +175,46 @@ do
 end
 
 -- SPAM FUNCTION
-local lastTarget -- Only track the last clicked player
+local lastTarget
 
 local function spamPlayer(plr)
-    if not Remote then
-        notify(TITLE_TEXT,"Remote not ready")
-        return
-    end
+    if not Remote then notify(TITLE_TEXT,"Remote not ready") return end
+    lastTarget = plr
 
-    lastTarget = plr -- update last clicked player
-
-    -- Execute commands in order as fast as possible
     task.spawn(function()
         for _,cmd in ipairs(COMMANDS) do
             if Remote and plr then
-                pcall(function()
-                    Remote:FireServer(plr,cmd)
-                end)
+                pcall(function() Remote:FireServer(plr,cmd) end)
             end
         end
         notify("Sent","Spammed @"..plr.Name.." in order")
     end)
 
-    -- Track only this session
     local function trackRespawn(char)
         local humanoid = char:WaitForChild("Humanoid",5)
         if not humanoid then return end
 
         humanoid.Died:Once(function()
-            -- Wait for respawn
             plr.CharacterAdded:Wait()
             local newChar = plr.Character
             if newChar and plr == lastTarget and Players:FindFirstChild(plr.Name) then
-                task.wait(0.1) -- wait for blue respawn box
+                task.wait(0.1)
                 if Remote then
                     pcall(function() Remote:FireServer(plr,"jail") end)
                     task.wait(1.2)
                     pcall(function() Remote:FireServer(plr,"ragdoll") end)
                     notify(TITLE_TEXT,"@"..plr.Name.." jailed & ragdolled")
                 end
-                lastTarget = nil -- reset after executing
+                lastTarget = nil
             end
         end)
     end
 
-    if plr.Character then
-        trackRespawn(plr.Character)
-    end
+    if plr.Character then trackRespawn(plr.Character) end
     plr.CharacterAdded:Connect(trackRespawn)
 
-    -- Remove tracking if player leaves
-    plr.AncestryChanged:Connect(function(_, parent)
-        if not parent and lastTarget == plr then
-            lastTarget = nil
-        end
+    plr.AncestryChanged:Connect(function(_,parent)
+        if not parent and lastTarget == plr then lastTarget=nil end
     end)
 end
 
@@ -226,15 +233,15 @@ end
 
 local function spamButton(plr)
     local b=Instance.new("TextButton")
-    b.Size=UDim2.new(1,-6,0,34)
+    b.Size=UDim2.new(1,-6,0,40)
     b.Text="  @"..plr.Name
     b.TextXAlignment=Enum.TextXAlignment.Left
     b.Font=Enum.Font.Gotham
-    b.TextSize=14
+    b.TextSize=16
     b.TextColor3=Color3.fromRGB(20,20,20)
     b.BackgroundColor3=BTN
     b.BorderSizePixel=0
-    Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
+    Instance.new("UICorner",b).CornerRadius = UDim.new(0,8)
 
     b.MouseEnter:Connect(function() b.BackgroundColor3=PURPLE_DARK end)
     b.MouseLeave:Connect(function() b.BackgroundColor3=BTN end)

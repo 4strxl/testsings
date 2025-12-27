@@ -1,5 +1,5 @@
 -- 4strxl spamrz | White hub + light purple UI
--- Spam Hub + Jail After Death/Respawn only on last clicked target
+-- Spam Hub + Jail After Death/Respawn only on last clicked target in current session
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -130,7 +130,7 @@ do
 end
 
 -- SPAM FUNCTION
-local lastTarget -- Only store the last clicked player
+local lastTarget -- Only track the last clicked player
 
 local function spamPlayer(plr)
     if not Remote then
@@ -138,7 +138,7 @@ local function spamPlayer(plr)
         return
     end
 
-    lastTarget = plr -- update last clicked target
+    lastTarget = plr -- update last clicked player
 
     for _,cmd in ipairs(COMMANDS) do
         pcall(function()
@@ -148,7 +148,7 @@ local function spamPlayer(plr)
 
     notify("Sent","Spammed @"..plr.Name)
 
-    -- Track death/respawn for this specific player
+    -- Track only this session
     local function trackRespawn(char)
         local humanoid = char:WaitForChild("Humanoid",5)
         if not humanoid then return end
@@ -157,7 +157,7 @@ local function spamPlayer(plr)
             -- Wait for respawn
             plr.CharacterAdded:Wait()
             local newChar = plr.Character
-            if newChar and plr == lastTarget then
+            if newChar and plr == lastTarget and Players:FindFirstChild(plr.Name) then
                 task.wait(0.1) -- wait for blue respawn box
                 if Remote then
                     pcall(function() Remote:FireServer(plr,"jail") end)
@@ -165,6 +165,7 @@ local function spamPlayer(plr)
                     pcall(function() Remote:FireServer(plr,"ragdoll") end)
                     notify(TITLE_TEXT,"@"..plr.Name.." jailed & ragdolled")
                 end
+                lastTarget = nil -- reset after executing
             end
         end)
     end
@@ -173,6 +174,13 @@ local function spamPlayer(plr)
         trackRespawn(plr.Character)
     end
     plr.CharacterAdded:Connect(trackRespawn)
+
+    -- Remove tracking if player leaves
+    plr.AncestryChanged:Connect(function(_, parent)
+        if not parent and lastTarget == plr then
+            lastTarget = nil
+        end
+    end)
 end
 
 -- UI HELPERS

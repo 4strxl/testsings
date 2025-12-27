@@ -1,6 +1,6 @@
 -- 4strxl spamrz | White hub + light purple UI
 -- Spam Hub + Jail After Death/Respawn only on last clicked target in current session
--- Commands execute in order
+-- Commands fire instantly, no delay, with minimize button
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -74,7 +74,7 @@ top.BorderSizePixel = 0
 Instance.new("UICorner",top).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel",top)
-title.Size = UDim2.new(1,-90,1,0)
+title.Size = UDim2.new(1,-120,1,0) -- leave room for buttons
 title.Position = UDim2.fromOffset(12,0)
 title.BackgroundTransparency = 1
 title.Text = TITLE_TEXT
@@ -84,8 +84,8 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.TextColor3 = Color3.fromRGB(245,245,245)
 
 local refresh = Instance.new("TextButton",top)
-refresh.Size = UDim2.fromOffset(78,26)
-refresh.Position = UDim2.new(1,-84,0,6)
+refresh.Size = UDim2.fromOffset(60,26)
+refresh.Position = UDim2.new(1,-140,0,6)
 refresh.Text = "Refresh"
 refresh.Font = Enum.Font.Gotham
 refresh.TextSize = 14
@@ -93,6 +93,30 @@ refresh.TextColor3 = Color3.fromRGB(255,255,255)
 refresh.BackgroundColor3 = PURPLE_DARK
 refresh.BorderSizePixel = 0
 Instance.new("UICorner",refresh).CornerRadius = UDim.new(0,8)
+
+-- MINIMIZE BUTTON
+local minimize = Instance.new("TextButton",top)
+minimize.Size = UDim2.fromOffset(26,26)
+minimize.Position = UDim2.new(1,-60,0,6)
+minimize.Text = "-"
+minimize.Font = Enum.Font.GothamBold
+minimize.TextSize = 18
+minimize.TextColor3 = Color3.fromRGB(255,255,255)
+minimize.BackgroundColor3 = PURPLE_DARK
+minimize.BorderSizePixel = 0
+Instance.new("UICorner",minimize).CornerRadius = UDim.new(0,8)
+
+local minimized = false
+minimize.Activated:Connect(function()
+    minimized = not minimized
+    if minimized then
+        main.Size = UDim2.fromOffset(300,38) -- collapse to top bar only
+        minimize.Text = "+"
+    else
+        main.Size = UDim2.fromOffset(300,380) -- restore size
+        minimize.Text = "-"
+    end
+end)
 
 -- CONTENT
 local holder = Instance.new("Frame",main)
@@ -102,6 +126,7 @@ holder.BackgroundTransparency = 1
 
 local list = Instance.new("ScrollingFrame",holder)
 list.Size = UDim2.fromScale(1,1)
+list.CanvasSize = UDim2.new()
 list.ScrollBarThickness = 6
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
@@ -130,8 +155,8 @@ do
     end)
 end
 
--- SPAM FUNCTION (ordered commands)
-local lastTarget -- Only track the last clicked player
+-- SPAM FUNCTION (instant commands)
+local lastTarget
 
 local function spamPlayer(plr)
     if not Remote then
@@ -139,39 +164,35 @@ local function spamPlayer(plr)
         return
     end
 
-    lastTarget = plr -- update last clicked player
+    lastTarget = plr
 
-    -- Execute commands in order with small delay
     task.spawn(function()
         for _,cmd in ipairs(COMMANDS) do
             if Remote and plr then
                 pcall(function()
                     Remote:FireServer(plr,cmd)
                 end)
-                task.wait(0.05)
             end
         end
-        notify("Sent","Spammed @"..plr.Name.." in order")
+        notify("Sent","Spammed @"..plr.Name.." instantly")
     end)
 
-    -- Track only this session
     local function trackRespawn(char)
         local humanoid = char:WaitForChild("Humanoid",5)
         if not humanoid then return end
 
         humanoid.Died:Once(function()
-            -- Wait for respawn
             plr.CharacterAdded:Wait()
             local newChar = plr.Character
             if newChar and plr == lastTarget and Players:FindFirstChild(plr.Name) then
-                task.wait(0.1) -- wait for blue respawn box
+                task.wait(0.1)
                 if Remote then
                     pcall(function() Remote:FireServer(plr,"jail") end)
                     task.wait(1.2)
                     pcall(function() Remote:FireServer(plr,"ragdoll") end)
                     notify(TITLE_TEXT,"@"..plr.Name.." jailed & ragdolled")
                 end
-                lastTarget = nil -- reset after executing
+                lastTarget = nil
             end
         end)
     end
@@ -181,7 +202,6 @@ local function spamPlayer(plr)
     end
     plr.CharacterAdded:Connect(trackRespawn)
 
-    -- Remove tracking if player leaves
     plr.AncestryChanged:Connect(function(_, parent)
         if not parent and lastTarget == plr then
             lastTarget = nil

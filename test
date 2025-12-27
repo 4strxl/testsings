@@ -1,5 +1,5 @@
 -- 4strxl spamrz | White hub + light purple UI
--- Jail After Death + Respawn + Spam Hub
+-- Spam Hub + Jail After Death/Respawn only on last clicked target
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,7 +29,7 @@ local function notify(t,d)
     end)
 end
 
--- FIND REMOTE (USED FOR SPAM & JAIL COMMANDS)
+-- FIND REMOTE
 local Remote
 task.spawn(function()
     local start = os.clock()
@@ -130,17 +130,49 @@ do
 end
 
 -- SPAM FUNCTION
+local lastTarget -- Only store the last clicked player
+
 local function spamPlayer(plr)
     if not Remote then
         notify(TITLE_TEXT,"Remote not ready")
         return
     end
+
+    lastTarget = plr -- update last clicked target
+
     for _,cmd in ipairs(COMMANDS) do
         pcall(function()
             Remote:FireServer(plr,cmd)
         end)
     end
+
     notify("Sent","Spammed @"..plr.Name)
+
+    -- Track death/respawn for this specific player
+    local function trackRespawn(char)
+        local humanoid = char:WaitForChild("Humanoid",5)
+        if not humanoid then return end
+
+        humanoid.Died:Once(function()
+            -- Wait for respawn
+            plr.CharacterAdded:Wait()
+            local newChar = plr.Character
+            if newChar and plr == lastTarget then
+                task.wait(0.1) -- wait for blue respawn box
+                if Remote then
+                    pcall(function() Remote:FireServer(plr,"jail") end)
+                    task.wait(1.2)
+                    pcall(function() Remote:FireServer(plr,"ragdoll") end)
+                    notify(TITLE_TEXT,"@"..plr.Name.." jailed & ragdolled")
+                end
+            end
+        end)
+    end
+
+    if plr.Character then
+        trackRespawn(plr.Character)
+    end
+    plr.CharacterAdded:Connect(trackRespawn)
 end
 
 -- UI HELPERS
@@ -172,50 +204,6 @@ local function spamButton(plr)
     b.MouseLeave:Connect(function() b.BackgroundColor3=BTN end)
     b.Activated:Connect(function() spamPlayer(plr) end)
     return b
-end
-
--- ===============================
--- JAIL AFTER DEATH + RESPAWN ONLY
--- ===============================
-local jailArmed = {}
-
-local function armJailAfterDeath(plr)
-    if jailArmed[plr] then return end
-    jailArmed[plr] = {died=false}
-
-    local function onCharacterAdded(char)
-        local humanoid = char:WaitForChild("Humanoid",5)
-        if not humanoid then return end
-
-        -- Track death
-        humanoid.Died:Once(function()
-            jailArmed[plr].died = true
-        end)
-
-        -- Only act after this character dies and respawns
-        humanoid.Died:Connect(function()
-            plr.CharacterAdded:Wait()
-            local newChar = plr.Character
-            if newChar and jailArmed[plr].died then
-                jailArmed[plr].died = false
-                task.wait(0.1) -- wait for blue respawn box
-                if Remote then
-                    pcall(function() Remote:FireServer(plr,"jail") end)
-                    task.wait(1.2)
-                    pcall(function() Remote:FireServer(plr,"ragdoll") end)
-                    notify(TITLE_TEXT,"@"..plr.Name.." jailed & ragdolled")
-                end
-            end
-        end)
-    end
-
-    if plr.Character then onCharacterAdded(plr.Character) end
-    plr.CharacterAdded:Connect(onCharacterAdded)
-end
-
--- Arm only existing players (not newly joined)
-for _,p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then armJailAfterDeath(p) end
 end
 
 -- REFRESH LIST

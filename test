@@ -1,7 +1,7 @@
 -- 4strxl spamrz | White hub + light purple UI
 -- Spam Hub + Jail After Death/Respawn only on last clicked target in current session
 -- Commands execute in order
--- Draggable hub fixed + Minimize button with animation
+-- Draggable hub fixed + Minimize button with animation + adjusted spawn
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -60,7 +60,7 @@ gui.IgnoreGuiInset = true
 
 local main = Instance.new("Frame", gui)
 main.Size = UDim2.fromOffset(300,380)
-main.Position = UDim2.new(1,-310,0.5,-190) -- Spawn on right-middle
+main.Position = UDim2.new(1,-310,0.5,-140) -- Spawn lower on the right side
 main.BackgroundColor3 = BG
 main.BorderSizePixel = 0
 Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
@@ -110,7 +110,6 @@ Instance.new("UICorner",minimize).CornerRadius = UDim.new(0,6)
 
 local minimized = false
 local fullSize = main.Size
-local fullCanvas = UDim2.new(1,0,1,0)
 minimize.MouseButton1Click:Connect(function()
     minimized = not minimized
     if minimized then
@@ -176,7 +175,6 @@ end
 
 -- SPAM FUNCTION
 local lastTarget
-
 local function spamPlayer(plr)
     if not Remote then notify(TITLE_TEXT,"Remote not ready") return end
     lastTarget = plr
@@ -212,7 +210,6 @@ local function spamPlayer(plr)
 
     if plr.Character then trackRespawn(plr.Character) end
     plr.CharacterAdded:Connect(trackRespawn)
-
     plr.AncestryChanged:Connect(function(_,parent)
         if not parent and lastTarget == plr then lastTarget=nil end
     end)
@@ -242,7 +239,6 @@ local function spamButton(plr)
     b.BackgroundColor3=BTN
     b.BorderSizePixel=0
     Instance.new("UICorner",b).CornerRadius = UDim.new(0,8)
-
     b.MouseEnter:Connect(function() b.BackgroundColor3=PURPLE_DARK end)
     b.MouseLeave:Connect(function() b.BackgroundColor3=BTN end)
     b.Activated:Connect(function() spamPlayer(plr) end)
@@ -254,12 +250,10 @@ local function refreshList()
     for _,v in ipairs(list:GetChildren()) do
         if v:IsA("TextButton") or v:IsA("TextLabel") then v:Destroy() end
     end
-
     section("spam commands").Parent=list
     for _,p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then spamButton(p).Parent=list end
     end
-
     task.wait()
     list.CanvasSize = UDim2.fromOffset(0,layout.AbsoluteContentSize.Y+10)
 end

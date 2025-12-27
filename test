@@ -1,0 +1,57 @@
+local function armMockJailAfterRespawn(targetPlayer)
+    if jailAfterRespawnArmed[targetPlayer] then return end
+
+    jailAfterRespawnArmed[targetPlayer] = {
+        died = false,
+        executed = false
+    }
+
+    notify(TITLE_TEXT, "[mock] armed jail-after-respawn for @" .. targetPlayer.Name)
+
+    local function onCharacterAdded(character)
+        local humanoid = character:WaitForChild("Humanoid", 5)
+        if not humanoid then return end
+
+        -- detect death
+        humanoid.Died:Once(function()
+            if jailAfterRespawnArmed[targetPlayer] then
+                jailAfterRespawnArmed[targetPlayer].died = true
+                notify(TITLE_TEXT, "[mock] @" .. targetPlayer.Name .. " died")
+            end
+        end)
+
+        -- detect respawn AFTER death
+        if jailAfterRespawnArmed[targetPlayer].died
+            and not jailAfterRespawnArmed[targetPlayer].executed then
+
+            jailAfterRespawnArmed[targetPlayer].executed = true
+
+            -- wait for respawn blue box to finish
+            character:WaitForChild("HumanoidRootPart", 5)
+            task.wait(0.1)
+
+            -- MOCK jail
+            notify(
+                TITLE_TEXT,
+                "[mock] jail executed on @" .. targetPlayer.Name
+            )
+
+            -- MOCK ragdoll 0.1s later
+            task.wait(0.1)
+            notify(
+                TITLE_TEXT,
+                "[mock] ragdoll executed on @" .. targetPlayer.Name
+            )
+
+            jailAfterRespawnArmed[targetPlayer] = nil
+        end
+    end
+
+    -- current character
+    if targetPlayer.Character then
+        onCharacterAdded(targetPlayer.Character)
+    end
+
+    -- future respawns
+    targetPlayer.CharacterAdded:Connect(onCharacterAdded)
+end

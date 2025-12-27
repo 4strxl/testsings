@@ -1,5 +1,6 @@
 -- 4strxl spamrz | White hub + light purple UI
 -- Spam Hub + Jail After Death/Respawn only on last clicked target in current session
+-- Commands execute in order
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -129,7 +130,7 @@ do
     end)
 end
 
--- SPAM FUNCTION
+-- SPAM FUNCTION (ordered commands)
 local lastTarget -- Only track the last clicked player
 
 local function spamPlayer(plr)
@@ -140,13 +141,18 @@ local function spamPlayer(plr)
 
     lastTarget = plr -- update last clicked player
 
-    for _,cmd in ipairs(COMMANDS) do
-        pcall(function()
-            Remote:FireServer(plr,cmd)
-        end)
-    end
-
-    notify("Sent","Spammed @"..plr.Name)
+    -- Execute commands in order with small delay
+    task.spawn(function()
+        for _,cmd in ipairs(COMMANDS) do
+            if Remote and plr then
+                pcall(function()
+                    Remote:FireServer(plr,cmd)
+                end)
+                task.wait(0.05)
+            end
+        end
+        notify("Sent","Spammed @"..plr.Name.." in order")
+    end)
 
     -- Track only this session
     local function trackRespawn(char)

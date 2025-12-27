@@ -175,7 +175,7 @@ local function spamButton(plr)
 end
 
 -- ===============================
--- JAIL AFTER DEATH + RESPAWN (CORRECTED)
+-- JAIL AFTER DEATH + RESPAWN ONLY
 -- ===============================
 local jailArmed = {}
 
@@ -192,9 +192,11 @@ local function armJailAfterDeath(plr)
             jailArmed[plr].died = true
         end)
 
-        -- Fire commands **only after death & next respawn**
-        plr.CharacterAdded:Connect(function(newChar)
-            if jailArmed[plr].died then
+        -- Only act after this character dies and respawns
+        humanoid.Died:Connect(function()
+            plr.CharacterAdded:Wait()
+            local newChar = plr.Character
+            if newChar and jailArmed[plr].died then
                 jailArmed[plr].died = false
                 task.wait(0.1) -- wait for blue respawn box
                 if Remote then
@@ -211,15 +213,10 @@ local function armJailAfterDeath(plr)
     plr.CharacterAdded:Connect(onCharacterAdded)
 end
 
--- Arm all current players
+-- Arm only existing players (not newly joined)
 for _,p in ipairs(Players:GetPlayers()) do
     if p ~= LocalPlayer then armJailAfterDeath(p) end
 end
-
--- Arm new players joining
-Players.PlayerAdded:Connect(function(p)
-    if p ~= LocalPlayer then armJailAfterDeath(p) end
-end)
 
 -- REFRESH LIST
 local function refreshList()

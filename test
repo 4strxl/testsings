@@ -175,45 +175,39 @@ local function spamButton(plr)
 end
 
 -- ===============================
--- JAIL AFTER DEATH + RESPAWN
+-- JAIL AFTER DEATH + RESPAWN (CORRECTED)
 -- ===============================
 local jailArmed = {}
 
 local function armJailAfterDeath(plr)
     if jailArmed[plr] then return end
-    jailArmed[plr] = {died=false, executed=false}
+    jailArmed[plr] = {died=false}
 
-    local function onCharacterAdded(character)
-        local humanoid = character:WaitForChild("Humanoid",5)
+    local function onCharacterAdded(char)
+        local humanoid = char:WaitForChild("Humanoid",5)
         if not humanoid then return end
 
-        -- Detect death
+        -- Track death
         humanoid.Died:Once(function()
             jailArmed[plr].died = true
         end)
 
-        -- Wait for respawn after death
-        humanoid.Died:Connect(function()
-            -- Wait for new character
-            plr.CharacterAdded:Wait()
-            local newChar = plr.Character
-            if newChar and not jailArmed[plr].executed then
-                jailArmed[plr].executed = true
-                task.wait(0.1) -- blue box delay
+        -- Fire commands **only after death & next respawn**
+        plr.CharacterAdded:Connect(function(newChar)
+            if jailArmed[plr].died then
+                jailArmed[plr].died = false
+                task.wait(0.1) -- wait for blue respawn box
                 if Remote then
                     pcall(function() Remote:FireServer(plr,"jail") end)
                     task.wait(1.2)
                     pcall(function() Remote:FireServer(plr,"ragdoll") end)
                     notify(TITLE_TEXT,"@"..plr.Name.." jailed & ragdolled")
                 end
-                jailArmed[plr] = nil
             end
         end)
     end
 
-    if plr.Character then
-        onCharacterAdded(plr.Character)
-    end
+    if plr.Character then onCharacterAdded(plr.Character) end
     plr.CharacterAdded:Connect(onCharacterAdded)
 end
 

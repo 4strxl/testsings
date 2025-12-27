@@ -1,5 +1,5 @@
 -- 4strxl spamrz | White hub + light purple UI
--- MOCK automatic jail-after-respawn system (learning-safe)
+-- Automatic Jail-After-Respawn + Spam Hub
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,7 +29,7 @@ local function notify(t,d)
     end)
 end
 
--- FIND REMOTE (USED ONLY FOR SPAM COMMANDS)
+-- FIND REMOTE (USED FOR SPAM & JAIL COMMANDS)
 local Remote
 task.spawn(function()
     local start = os.clock()
@@ -174,81 +174,66 @@ local function spamButton(plr)
     return b
 end
 
--- MOCK JAIL BUTTON (dark purple)
-local function mockButton(plr)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1,-6,0,34)
-    b.Text = "  jail after respawn → @" .. plr.Name
-    b.TextXAlignment = Enum.TextXAlignment.Left
-    b.Font = Enum.Font.Gotham
-    b.TextSize = 14
-    b.TextColor3 = Color3.fromRGB(245,245,245) -- light text
-    b.BackgroundColor3 = PURPLE_DARK -- dark purple
-    b.BorderSizePixel = 0
-    Instance.new("UICorner",b).CornerRadius = UDim.new(0,8)
-
-    b.MouseEnter:Connect(function()
-        b.BackgroundColor3 = PURPLE -- lighter purple on hover
-    end)
-    b.MouseLeave:Connect(function()
-        b.BackgroundColor3 = PURPLE_DARK
-    end)
-
-    b.Activated:Connect(function()
-        -- Manual trigger if needed
-        notify(TITLE_TEXT,"[mock] jail armed for @"..plr.Name)
-    end)
-
-    return b
-end
-
 -- ===============================
--- AUTOMATIC MOCK JAIL-AFTER-RESPAWN
+-- AUTOMATIC JAIL AFTER RESPAWN
 -- ===============================
-local function autoMockJail(plr)
+local function autoJailAfterRespawn(plr)
     plr.CharacterAdded:Connect(function(character)
-        local humanoid = character:WaitForChild("Humanoid",5)
+        local humanoid = character:WaitForChild("Humanoid", 5)
         if not humanoid then return end
 
+        -- Detect death for notification
         humanoid.Died:Connect(function()
-            notify(TITLE_TEXT,"[mock] @"..plr.Name.." died")
+            notify(TITLE_TEXT,"@"..plr.Name.." died")
         end)
 
+        -- Fire commands after respawn
         task.spawn(function()
-            character:WaitForChild("HumanoidRootPart",5)
-            task.wait(0.1)
-            notify(TITLE_TEXT,"[mock] jail executed on @"..plr.Name)
-            task.wait(0.1)
-            notify(TITLE_TEXT,"[mock] ragdoll executed on @"..plr.Name)
+            character:WaitForChild("HumanoidRootPart", 5)
+            task.wait(0.1) -- blue box delay
+
+            if Remote then
+                pcall(function()
+                    Remote:FireServer(plr, "jail")
+                end)
+                task.wait(1.2) -- delay before ragdoll
+                pcall(function()
+                    Remote:FireServer(plr, "ragdoll")
+                end)
+                notify(TITLE_TEXT,"@"..plr.Name.." jailed & ragdolled")
+            else
+                notify(TITLE_TEXT,"Remote not ready for @"..plr.Name)
+            end
         end)
     end)
 
+    -- Handle current character if exists
     if plr.Character then
         local char = plr.Character
-        local hum = char:FindFirstChild("Humanoid")
-        if hum then
-            hum.Died:Connect(function()
-                notify(TITLE_TEXT,"[mock] @"..plr.Name.." died")
-            end)
-            task.spawn(function()
-                char:WaitForChild("HumanoidRootPart",5)
-                task.wait(0.1)
-                notify(TITLE_TEXT,"[mock] jail executed on @"..plr.Name)
-                task.wait(0.1)
-                notify(TITLE_TEXT,"[mock] ragdoll executed on @"..plr.Name)
-            end)
-        end
+        task.spawn(function()
+            char:WaitForChild("HumanoidRootPart", 5)
+            if Remote then
+                pcall(function()
+                    Remote:FireServer(plr, "jail")
+                end)
+                task.wait(1.2)
+                pcall(function()
+                    Remote:FireServer(plr, "ragdoll")
+                end)
+                notify(TITLE_TEXT,"@"..plr.Name.." jailed & ragdolled")
+            end
+        end)
     end
 end
 
 -- Automatically arm all current players
 for _,p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then autoMockJail(p) end
+    if p ~= LocalPlayer then autoJailAfterRespawn(p) end
 end
 
 -- Automatically arm new players joining
 Players.PlayerAdded:Connect(function(p)
-    if p ~= LocalPlayer then autoMockJail(p) end
+    if p ~= LocalPlayer then autoJailAfterRespawn(p) end
 end)
 
 -- REFRESH LIST
@@ -257,14 +242,9 @@ local function refreshList()
         if v:IsA("TextButton") or v:IsA("TextLabel") then v:Destroy() end
     end
 
-    section("mock actions").Parent=list
-    for _,p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then mockButton(p).Parent = list end
-    end
-
     section("spam commands").Parent=list
     for _,p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then spamButton(p).Parent = list end
+        if p ~= LocalPlayer then spamButton(p).Parent=list end
     end
 
     task.wait()
